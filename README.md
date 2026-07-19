@@ -85,8 +85,30 @@ docker compose up
 
 Primer arranque: instala Odoo + todas las apps de la tabla de arriba
 automáticamente (`--init=...` en `docker-compose.yml`). Tarda unos minutos.
-Luego entra en http://localhost:8069, crea la base de datos si no se creó
-sola, y usuario admin.
+Luego entra en http://localhost:8069 con usuario `admin` / contraseña `admin`
+(cámbiala en cuanto entres) y crea la base de datos si no se creó sola.
+
+### Poner la interfaz en español
+
+Por defecto Odoo instala solo en inglés. Para cargar el paquete de español
+y ponerlo como idioma del usuario admin:
+
+```bash
+docker compose exec -T odoo odoo -d ivb_odoo --db_host=db \
+  --db_user=$DB_USER --db_password=$DB_PASSWORD \
+  --load-language=es_ES --stop-after-init
+
+docker compose exec -T odoo odoo shell -d ivb_odoo --db_host=db \
+  --db_user=$DB_USER --db_password=$DB_PASSWORD --no-http <<'PYEOF'
+env['res.users'].search([('login','=','admin')]).write({'lang': 'es_ES'})
+env.cr.commit()
+PYEOF
+```
+
+**Nota:** esto vive en la base de datos, no en el código. Si alguna vez
+haces `docker compose down -v` (borra los volúmenes y reinstala desde cero,
+como se hizo varias veces durante el desarrollo de este PoC para probar
+cambios en los módulos), hay que repetirlo.
 
 ## Configurar el conector (con credenciales de prueba/placeholder)
 
