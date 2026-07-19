@@ -39,8 +39,8 @@
                             <field name="ivb_connector_sync_orders"/>
                             <label for="ivb_connector_sync_orders"/>
                         </setting>
-                        <setting id="ivb_connector_push_stock_setting">
-                            <field name="ivb_connector_push_stock"/>
+                        <setting id="ivb_connector_push_stock_setting" help="Desactivado a propósito por ahora: el conector es de solo lectura mientras se valida el mapeo de datos contra la tienda real. Aunque se marque, no se escribirá nada en la tienda (bloqueado en el código, no solo aquí).">
+                            <field name="ivb_connector_push_stock" readonly="1"/>
                             <label for="ivb_connector_push_stock"/>
                         </setting>
                     </block>

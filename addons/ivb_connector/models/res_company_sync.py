@@ -16,6 +16,14 @@ from .connectors.base import ConnectorError
 
 _logger = logging.getLogger(__name__)
 
+# El PoC es de solo lectura a propósito: todavía no se ha validado el
+# mapeo de datos contra la tienda real de IVB, así que no se debe escribir
+# nada en WooCommerce (ni Shopify el día que se implemente). El único punto
+# de escritura hacia la tienda es push_stock_levels(); este flag lo bloquea
+# aunque alguien active la casilla "Empujar stock" en Ajustes por error.
+# Cuando se quiera activar de verdad, cambiar a False aquí explícitamente.
+READ_ONLY_MODE = True
+
 
 class ResCompany(models.Model):
     _inherit = "res.company"
@@ -87,8 +95,17 @@ class ResCompany(models.Model):
             self._ivb_sync_customers(connector, since)
         if self.ivb_connector_sync_orders:
             self._ivb_sync_orders(connector, since)
-        if self.ivb_connector_push_stock:
+        if self.ivb_connector_push_stock and not READ_ONLY_MODE:
             self._ivb_push_stock(connector)
+        elif self.ivb_connector_push_stock and READ_ONLY_MODE:
+            _logger.warning(
+                "IVB Connector: 'Empujar stock' está activado pero el conector está en "
+                "modo solo lectura (READ_ONLY_MODE=True) — no se ha escrito nada en la tienda."
+            )
+            self._ivb_log(
+                "push_stock", "error",
+                message=_("Bloqueado: el conector está en modo solo lectura (READ_ONLY_MODE)."),
+            )
 
         self.ivb_connector_last_sync = datetime.now()
 

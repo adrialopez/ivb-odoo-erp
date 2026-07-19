@@ -4,6 +4,14 @@ Prueba de concepto de un Odoo "estilo Gextia" para **IVB Wellness Lab**: ERP
 para una empresa **distribuidora/importadora, no fabricante**, conectado a
 su tienda online.
 
+> **Modo solo lectura:** por ahora el conector nunca escribe nada en la
+> tienda online. El único punto de escritura hacia fuera (`push_stock_levels`,
+> que empujaría stock a WooCommerce) está bloqueado a nivel de código con
+> `READ_ONLY_MODE = True` en `models/res_company_sync.py` — no basta con
+> desmarcar la casilla en Ajustes, hay que cambiar esa constante
+> explícitamente cuando se quiera activar de verdad. La lectura (traer
+> productos/clientes/pedidos de la tienda hacia Odoo) sí funciona.
+
 > **Nota de contexto:** la tienda de IVB (`profesional.ivbwellness.com`) está
 > en proceso de migración de WooCommerce a Shopify (ver proyecto
 > `ivb-shopify-export`). Por eso este PoC conecta contra WooCommerce ahora
