@@ -168,12 +168,22 @@ en origen sea `completed`.
 - Asignar la posición fiscal de recargo de equivalencia por cliente (ver
   sección de impuestos arriba) — falta decidir la fuente de esa
   información en WooCommerce.
-- **Asignación de comercial por cliente:** IVB tiene un listado de qué
-  comercial lleva cada cliente. Falta decidir de dónde lo lee el conector
-  (¿el mismo mecanismo que ya usa `ivb-pedidos-comerciales` — meta
-  `_ipc_comercial_email` en WooCommerce —, o una lista aparte que dé el
-  cliente?) y mapear ese email a un `res.users` de Odoo para poner
-  `sale.order.user_id` al crear el pedido.
+- ~~Asignación de comercial por cliente~~ — **hecho.** El cliente de
+  WooCommerce trae un meta `comercial` con el email del comercial asignado
+  (confirmado contra `profesional.ivbwellness.com`, no es
+  `_ipc_comercial_email` como se pensó al principio — ese es el meta a
+  nivel de *pedido* que usa el TPV, este es a nivel de *cliente*).
+  `_ivb_find_salesperson` en `res_company_sync.py` busca un `res.users` con
+  ese email como login y lo asigna como `res.partner.user_id`
+  ("Salesperson"); el pedido hereda el comercial de su cliente al crearse.
+  Si el comercial no existe todavía en Odoo, **se crea automáticamente**
+  como usuario interno mínimo (nombre derivado del email, sin contraseña).
+  Todo el sync corre con `tracking_disable=True` para que ni la creación
+  del usuario (`no_reset_password=True`, evita el email de invitación de
+  `auth_signup`) ni la asignación como Salesperson (que si no, dispara una
+  notificación "Has sido asignado a `<cliente>`" al chatter del usuario)
+  avisen a nadie todavía — verificado comparando `mail.mail` antes/después
+  de sincronizar (delta 0).
 - Reglas de precio/tarifa por cliente (B2B vs B2C) — Odoo `product.pricelist`.
 - Multi-almacén real si IVB tiene más de un almacén físico.
 - Paginación completa del catálogo al sincronizar productos (ahora mismo

@@ -37,7 +37,10 @@ class EcommerceConnector(ABC):
     @abstractmethod
     def fetch_customers(self, since=None, limit=100):
         """Devuelve una lista de dicts:
-        {external_id, name, email, phone, street, city, zip, country_code, vat}
+        {external_id, name, email, phone, street, city, zip, country_code, vat,
+         comercial_email}
+        comercial_email es el email del comercial asignado a ese cliente
+        (mismo mecanismo que ivb-pedidos-comerciales), o None si no tiene.
         """
 
     @abstractmethod

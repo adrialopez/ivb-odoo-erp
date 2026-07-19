@@ -92,6 +92,18 @@ class WooCommerceConnector(EcommerceConnector):
 
     # -- normalización WooCommerce -> formato interno -----------------
     @staticmethod
+    def _meta(meta_data, key):
+        """WooCommerce devuelve los custom fields como una lista de
+        {id, key, value} en 'meta_data' (productos, clientes y pedidos).
+        El meta 'comercial' en el cliente de WooCommerce contiene
+        directamente el email del comercial asignado (confirmado contra
+        la tienda real: profesional.ivbwellness.com)."""
+        for entry in meta_data or []:
+            if entry.get("key") == key:
+                return entry.get("value") or None
+        return None
+
+    @staticmethod
     def _normalize_product(p):
         return {
             "external_id": str(p.get("id")),
@@ -104,8 +116,8 @@ class WooCommerceConnector(EcommerceConnector):
             "tax_class": p.get("tax_class") or "standard",
         }
 
-    @staticmethod
-    def _normalize_customer(c):
+    @classmethod
+    def _normalize_customer(cls, c):
         billing = c.get("billing") or {}
         return {
             "external_id": str(c.get("id")),
@@ -117,6 +129,7 @@ class WooCommerceConnector(EcommerceConnector):
             "zip": billing.get("postcode"),
             "country_code": billing.get("country"),
             "vat": False,
+            "comercial_email": cls._meta(c.get("meta_data"), "comercial"),
         }
 
     @classmethod

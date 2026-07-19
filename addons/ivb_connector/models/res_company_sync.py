@@ -99,6 +99,13 @@ class ResCompany(models.Model):
 
     def _ivb_run_sync(self):
         self.ensure_one()
+        # tracking_disable corta CUALQUIER efecto de mail.thread durante el
+        # sync: sin esto, asignar comercial (res.partner.user_id) dispara
+        # una notificación "Has sido asignado a <cliente>" al chatter/bandeja
+        # de ese usuario — un aviso real, aunque no sea un email explícito.
+        # No se quiere avisar a nadie todavía, así que se corta de raíz para
+        # todo lo que haga este método (partners, productos, pedidos).
+        self = self.with_context(tracking_disable=True, mail_create_nolog=True, mail_notrack=True)
         connector = self._ivb_get_connector()
         since = self.ivb_connector_last_sync
 
@@ -194,6 +201,28 @@ class ResCompany(models.Model):
             return
         self._ivb_log("customers", "success", record_count=len(customers), duration=time.time() - started)
 
+    def _ivb_find_salesperson(self, comercial_email):
+        """Busca el res.users cuyo login es el email del comercial (meta
+        'comercial' del cliente en WooCommerce); si no existe, lo crea como
+        usuario interno mínimo. no_reset_password=True es imprescindible:
+        sin ese contexto, auth_signup.ResUsers.create() manda automáticamente
+        un email de invitación/alta de contraseña al crear el usuario, y
+        todavía no se quiere avisar a nadie de esto (PoC)."""
+        if not comercial_email:
+            return self.env["res.users"]
+        Users = self.env["res.users"].sudo()
+        user = Users.search([("login", "=", comercial_email)], limit=1)
+        if user:
+            return user
+        _logger.info("IVB Connector: creando usuario interno para el comercial '%s'", comercial_email)
+        name = comercial_email.split("@")[0].replace(".", " ").replace("_", " ").title()
+        return Users.with_context(no_reset_password=True).create({
+            "name": name,
+            "login": comercial_email,
+            "email": comercial_email,
+            "group_ids": [(4, self.env.ref("base.group_user").id)],
+        })
+
     def _ivb_update_or_create_partner(self, data):
         Partner = self.env["res.partner"].sudo()
         partner = None
@@ -208,6 +237,9 @@ class ResCompany(models.Model):
             "zip": data.get("zip"),
             "customer_rank": 1,
         }
+        salesperson = self._ivb_find_salesperson(data.get("comercial_email"))
+        if salesperson:
+            vals["user_id"] = salesperson.id
         if partner:
             partner.write(vals)
             return partner
@@ -259,6 +291,10 @@ class ResCompany(models.Model):
             {
                 "company_id": self.id,
                 "partner_id": partner.id,
+                # El comercial se asigna por cliente (meta 'comercial'
+                # en WooCommerce, resuelto en _ivb_update_or_create_partner);
+                # el pedido simplemente hereda el de su cliente.
+                "user_id": partner.user_id.id if partner.user_id else False,
                 "client_order_ref": data["external_id"],
                 "origin": f"{self.ivb_connector_platform}:{data['number']}",
                 "order_line": order_lines,
