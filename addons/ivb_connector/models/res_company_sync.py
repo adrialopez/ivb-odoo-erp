@@ -133,7 +133,10 @@ class ResCompany(models.Model):
         if product:
             product.write(vals)
         else:
-            vals.update({"type": "product", "company_id": self.id})
+            # Odoo 19: ya no existe type="product" para artículos con stock;
+            # ahora es type="consu" + is_storable=True (antes de 18 sí existía
+            # el valor "product" en el selection, por eso el fallo original).
+            vals.update({"type": "consu", "is_storable": True, "company_id": self.id})
             Product.create(vals)
 
     # -- clientes ---------------------------------------------------------
