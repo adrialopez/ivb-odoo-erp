@@ -39,7 +39,9 @@ class EcommerceConnector(ABC):
         """Devuelve una lista de dicts:
         {external_id, name, email, phone, street, city, zip, country_code,
          vat, role, tipo, comercial_email, sepa_days, sepa_min_amount,
-         sepa_max_amount, purchase_limit_enabled, monthly_purchase_limit}
+         sepa_max_amount, purchase_limit_enabled, monthly_purchase_limit,
+         apertura_email, procedencia, iqvia, escala, escala_automatica,
+         unidades_compradas, fecha_cumpleanos, visitada, grupo_compra}
         - role: rol de la plataforma de origen (en WooCommerce: 'customer',
           'subscriber', 're', 'sepa', 'comercial'... son roles custom del
           sitio de IVB). role == 're' dispara la posición fiscal de recargo
@@ -48,6 +50,12 @@ class EcommerceConnector(ABC):
         - vat, tipo, sepa_*, purchase_limit*: datos de negocio ya presentes
           en la ficha de cliente de WooCommerce (CIF, tipo de cliente,
           condiciones de pago SEPA, límite de compra mensual).
+        - apertura_email, procedencia, iqvia, escala, escala_automatica,
+          unidades_compradas, fecha_cumpleanos, visitada: seguimiento
+          comercial de farmacia, sin transformación de negocio — se guardan
+          tal cual en campos propios de res.partner.
+        - grupo_compra: central de compras del cliente (ej. Cofares); se
+          modela como empresa matriz (res.partner.parent_id).
         """
 
     @abstractmethod

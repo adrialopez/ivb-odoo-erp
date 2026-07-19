@@ -18,6 +18,20 @@
                             <field name="ivb_monthly_purchase_limit" invisible="not ivb_purchase_limit_enabled"/>
                         </group>
                     </group>
+                    <group>
+                        <group string="Seguimiento comercial">
+                            <field name="ivb_apertura_email"/>
+                            <field name="ivb_procedencia"/>
+                            <field name="ivb_iqvia"/>
+                            <field name="ivb_visitada"/>
+                            <field name="ivb_fecha_cumpleanos"/>
+                        </group>
+                        <group string="Escala">
+                            <field name="ivb_escala"/>
+                            <field name="ivb_escala_automatica"/>
+                            <field name="ivb_unidades_compradas"/>
+                        </group>
+                    </group>
                 </page>
             </notebook>
         </field>

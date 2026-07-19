@@ -6,6 +6,7 @@ sirve por HTTPS (profesional.ivbwellness.com). Si algún día se usa por HTTP
 plano habría que pasar a OAuth1 por query string en su lugar.
 """
 import logging
+from datetime import datetime
 
 import requests
 
@@ -129,6 +130,36 @@ class WooCommerceConnector(EcommerceConnector):
         value = WooCommerceConnector._meta(meta_data, key)
         return str(value) in ("1", "true", "True", "yes")
 
+    # Placeholders que el sitio de IVB usa quiere decir "sin asignar" en vez
+    # de un valor real; se normalizan a None para no meter texto basura en
+    # los campos de Odoo.
+    _EMPTY_PLACEHOLDERS = {"no asignado", "no asignada", "n/a", "-"}
+
+    @classmethod
+    def _meta_clean(cls, meta_data, key):
+        value = cls._meta(meta_data, key)
+        if value is None or str(value).strip().lower() in cls._EMPTY_PLACEHOLDERS:
+            return None
+        return value
+
+    @classmethod
+    def _meta_int(cls, meta_data, key):
+        value = cls._meta_float(meta_data, key)
+        return int(value) if value is not None else None
+
+    @classmethod
+    def _meta_date(cls, meta_data, key):
+        value = cls._meta_clean(meta_data, key)
+        if not value:
+            return None
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(value, fmt).date().isoformat()
+            except ValueError:
+                continue
+        _logger.warning("IVB Connector: fecha '%s' del meta '%s' no reconocida, se omite", value, key)
+        return None
+
     @classmethod
     def _normalize_customer(cls, c):
         billing = c.get("billing") or {}
@@ -151,6 +182,15 @@ class WooCommerceConnector(EcommerceConnector):
             "sepa_max_amount": cls._meta_float(meta, "sepa_max_amount"),
             "purchase_limit_enabled": cls._meta_bool(meta, "purchase_limit_enabled"),
             "monthly_purchase_limit": cls._meta_float(meta, "monthly_purchase_limit"),
+            "apertura_email": cls._meta_clean(meta, "apertura"),
+            "procedencia": cls._meta_clean(meta, "procedencia"),
+            "iqvia": cls._meta_clean(meta, "iqvia"),
+            "escala": cls._meta_int(meta, "escala"),
+            "escala_automatica": cls._meta_bool(meta, "escalaAuto"),
+            "unidades_compradas": cls._meta_int(meta, "unidadesCompradas"),
+            "fecha_cumpleanos": cls._meta_date(meta, "fecha_cumpleanos"),
+            "visitada": cls._meta_bool(meta, "visitada"),
+            "grupo_compra": cls._meta_clean(meta, "grupo"),
         }
 
     @classmethod

@@ -162,8 +162,20 @@ de navegador o sync de HubSpot):
 | `tipo` (ej. `farmacia`) | Etiqueta de contacto (`res.partner.category_id`), se crea si no existe |
 | `role` == `re` | Posición fiscal "Equivalence surcharge" |
 | `comercial` | `res.partner.user_id` (ver sección de comerciales) |
+| `grupo` (central de compras, ej. Cofares) | Empresa matriz (`res.partner.parent_id`), se crea si no existe |
 | `sepa_days` / `sepa_min_amount` / `sepa_max_amount` | Campos propios `ivb_sepa_*` (sin equivalente nativo en Odoo) |
 | `purchase_limit_enabled` / `monthly_purchase_limit` | Campos propios `ivb_purchase_limit_enabled` / `ivb_monthly_purchase_limit` |
+| `apertura` / `procedencia` / `iqvia` / `escala` / `escalaAuto` / `unidadesCompradas` / `fecha_cumpleanos` / `visitada` | Campos propios `ivb_apertura_email`, `ivb_procedencia`, `ivb_iqvia`, `ivb_escala`, `ivb_escala_automatica`, `ivb_unidades_compradas`, `ivb_fecha_cumpleanos`, `ivb_visitada` — seguimiento comercial de farmacia, se importan tal cual |
+
+**Deliberadamente fuera** (revisados en el admin de WooCommerce pero
+descartados por ser seguimiento de material promocional, no ficha de
+cliente): `regletas`, `vademecum`, `stoppers`, `expositor`, `vinilo`,
+`vinilo_navidad` — encajan más con `material-promocional-b2b` que con el
+ERP.
+
+Valores placeholder de WooCommerce como `"No asignado"`/`"No asignada"` se
+normalizan a vacío en vez de guardarse como texto literal (`_meta_clean`
+en `woocommerce.py`).
 
 Los campos propios se ven en la ficha de contacto, pestaña **"IVB -
 Condiciones"**. Solo se importaron los 3 clientes que WooCommerce expone

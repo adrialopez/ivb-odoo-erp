@@ -230,6 +230,16 @@ class ResCompany(models.Model):
         tag = Category.search([("name", "=", name)], limit=1)
         return tag or Category.create({"name": name})
 
+    def _ivb_get_or_create_grupo_compra(self, name):
+        """'grupo' en WooCommerce es la central de compras del cliente
+        (ej. Cofares, Bidafarma...). Se modela como empresa matriz
+        (res.partner.parent_id) en vez de como etiqueta: es una relación
+        jerárquica real, no una simple clasificación, y así Odoo la
+        muestra de forma nativa en la ficha de la empresa (contactos hijos)."""
+        Partner = self.env["res.partner"].sudo()
+        grupo = Partner.search([("name", "=", name), ("is_company", "=", True), ("company_id", "in", [self.id, False])], limit=1)
+        return grupo or Partner.create({"name": name, "is_company": True, "company_id": self.id})
+
     def _ivb_get_re_fiscal_position(self):
         """Posición fiscal de recargo de equivalencia que ya trae la
         plantilla contable es_pymes (ver README, sección Impuestos)."""
@@ -266,6 +276,25 @@ class ResCompany(models.Model):
             vals["ivb_purchase_limit_enabled"] = bool(data["purchase_limit_enabled"])
         if data.get("monthly_purchase_limit") is not None:
             vals["ivb_monthly_purchase_limit"] = data["monthly_purchase_limit"]
+        if data.get("apertura_email"):
+            vals["ivb_apertura_email"] = data["apertura_email"]
+        if data.get("procedencia"):
+            vals["ivb_procedencia"] = data["procedencia"]
+        if data.get("iqvia"):
+            vals["ivb_iqvia"] = data["iqvia"]
+        if data.get("escala") is not None:
+            vals["ivb_escala"] = data["escala"]
+        if "escala_automatica" in data:
+            vals["ivb_escala_automatica"] = bool(data["escala_automatica"])
+        if data.get("unidades_compradas") is not None:
+            vals["ivb_unidades_compradas"] = data["unidades_compradas"]
+        if data.get("fecha_cumpleanos"):
+            vals["ivb_fecha_cumpleanos"] = data["fecha_cumpleanos"]
+        if "visitada" in data:
+            vals["ivb_visitada"] = bool(data["visitada"])
+        if data.get("grupo_compra"):
+            grupo = self._ivb_get_or_create_grupo_compra(data["grupo_compra"])
+            vals["parent_id"] = grupo.id
         # Recargo de equivalencia: rol 're' en WooCommerce (mismo rol que ya
         # usa ivb-pedidos-comerciales para bloquear/permitir formas de pago)
         # -> posición fiscal "Equivalence surcharge" de la plantilla es_pymes,
