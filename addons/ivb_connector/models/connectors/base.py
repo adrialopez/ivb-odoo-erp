@@ -37,10 +37,17 @@ class EcommerceConnector(ABC):
     @abstractmethod
     def fetch_customers(self, since=None, limit=100):
         """Devuelve una lista de dicts:
-        {external_id, name, email, phone, street, city, zip, country_code, vat,
-         comercial_email}
-        comercial_email es el email del comercial asignado a ese cliente
-        (mismo mecanismo que ivb-pedidos-comerciales), o None si no tiene.
+        {external_id, name, email, phone, street, city, zip, country_code,
+         vat, role, tipo, comercial_email, sepa_days, sepa_min_amount,
+         sepa_max_amount, purchase_limit_enabled, monthly_purchase_limit}
+        - role: rol de la plataforma de origen (en WooCommerce: 'customer',
+          'subscriber', 're', 'sepa', 'comercial'... son roles custom del
+          sitio de IVB). role == 're' dispara la posición fiscal de recargo
+          de equivalencia en res_company_sync.py.
+        - comercial_email: email del comercial asignado a ese cliente.
+        - vat, tipo, sepa_*, purchase_limit*: datos de negocio ya presentes
+          en la ficha de cliente de WooCommerce (CIF, tipo de cliente,
+          condiciones de pago SEPA, límite de compra mensual).
         """
 
     @abstractmethod

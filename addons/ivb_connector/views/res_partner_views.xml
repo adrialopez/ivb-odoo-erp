@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="view_partner_form_ivb_connector" model="ir.ui.view">
+        <field name="name">res.partner.form.ivb.connector</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+            <notebook position="inside">
+                <page string="IVB - Condiciones" name="ivb_connector_conditions">
+                    <group>
+                        <group string="SEPA">
+                            <field name="ivb_sepa_days"/>
+                            <field name="ivb_sepa_min_amount"/>
+                            <field name="ivb_sepa_max_amount"/>
+                        </group>
+                        <group string="Límite de compra">
+                            <field name="ivb_purchase_limit_enabled"/>
+                            <field name="ivb_monthly_purchase_limit" invisible="not ivb_purchase_limit_enabled"/>
+                        </group>
+                    </group>
+                </page>
+            </notebook>
+        </field>
+    </record>
+</odoo>

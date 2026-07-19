@@ -24,6 +24,7 @@ Odoo) no cambia al cambiar de plataforma.
         "security/ir.model.access.csv",
         "data/ir_cron_data.xml",
         "views/res_config_settings_views.xml",
+        "views/res_partner_views.xml",
         "views/ivb_connector_sync_log_views.xml",
         "views/ivb_connector_menus.xml",
     ],

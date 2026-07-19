@@ -143,12 +143,34 @@ un resync no pisa un impuesto que se haya corregido a mano.
 
 **Por cliente (RE):** en Odoo el recargo se aplica por *cliente*
 (posición fiscal), no por producto — mucho más limpio que el hack de
-WooCommerce de duplicar cada producto en una clase `-re`. **Pendiente:**
-el conector todavía no asigna la posición fiscal "Equivalence surcharge"
-a los clientes RE, porque no está resuelto de dónde sacar qué clientes de
-WooCommerce son RE (¿rol `re` de WordPress, expuesto en la API? ¿una lista
-aparte?). Hasta que se resuelva, hay que marcarlo a mano por cliente en
-Odoo (Ventas → Clientes → pestaña Ventas y compras → Posición fiscal).
+WooCommerce de duplicar cada producto en una clase `-re`. **Hecho:** el
+cliente de WooCommerce con rol `re` (mismo rol que ya usa
+`ivb-pedidos-comerciales` para bloquear formas de pago) recibe
+automáticamente la posición fiscal "Equivalence surcharge" en
+`res.partner.property_account_position_id`.
+
+## Otros datos del cliente que se importan
+
+Además de nombre/email/teléfono/dirección/comercial, el cliente de
+WooCommerce trae más metadatos de negocio reales (revisados a mano contra
+la tienda real, descartando ruido de tracking/analytics tipo fingerprint
+de navegador o sync de HubSpot):
+
+| Meta/campo WooCommerce | Campo en Odoo |
+|---|---|
+| `cif` | `res.partner.vat` |
+| `tipo` (ej. `farmacia`) | Etiqueta de contacto (`res.partner.category_id`), se crea si no existe |
+| `role` == `re` | Posición fiscal "Equivalence surcharge" |
+| `comercial` | `res.partner.user_id` (ver sección de comerciales) |
+| `sepa_days` / `sepa_min_amount` / `sepa_max_amount` | Campos propios `ivb_sepa_*` (sin equivalente nativo en Odoo) |
+| `purchase_limit_enabled` / `monthly_purchase_limit` | Campos propios `ivb_purchase_limit_enabled` / `ivb_monthly_purchase_limit` |
+
+Los campos propios se ven en la ficha de contacto, pestaña **"IVB -
+Condiciones"**. Solo se importaron los 3 clientes que WooCommerce expone
+en su endpoint `/customers` con cuenta registrada — la mayoría de clientes
+de IVB probablemente se gestionan como pedidos sin cuenta (checkout
+guest), así que estos datos de ficha de cliente no cubren toda la base de
+clientes todavía.
 
 ## Pedidos: se confirman solos si ya están pagados
 

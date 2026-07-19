@@ -116,9 +116,23 @@ class WooCommerceConnector(EcommerceConnector):
             "tax_class": p.get("tax_class") or "standard",
         }
 
+    @staticmethod
+    def _meta_float(meta_data, key):
+        value = WooCommerceConnector._meta(meta_data, key)
+        try:
+            return float(value) if value not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _meta_bool(meta_data, key):
+        value = WooCommerceConnector._meta(meta_data, key)
+        return str(value) in ("1", "true", "True", "yes")
+
     @classmethod
     def _normalize_customer(cls, c):
         billing = c.get("billing") or {}
+        meta = c.get("meta_data")
         return {
             "external_id": str(c.get("id")),
             "name": (f"{c.get('first_name', '')} {c.get('last_name', '')}".strip() or c.get("username")),
@@ -128,8 +142,15 @@ class WooCommerceConnector(EcommerceConnector):
             "city": billing.get("city"),
             "zip": billing.get("postcode"),
             "country_code": billing.get("country"),
-            "vat": False,
-            "comercial_email": cls._meta(c.get("meta_data"), "comercial"),
+            "vat": cls._meta(meta, "cif"),
+            "role": c.get("role"),
+            "tipo": cls._meta(meta, "tipo"),
+            "comercial_email": cls._meta(meta, "comercial"),
+            "sepa_days": cls._meta_float(meta, "sepa_days"),
+            "sepa_min_amount": cls._meta_float(meta, "sepa_min_amount"),
+            "sepa_max_amount": cls._meta_float(meta, "sepa_max_amount"),
+            "purchase_limit_enabled": cls._meta_bool(meta, "purchase_limit_enabled"),
+            "monthly_purchase_limit": cls._meta_float(meta, "monthly_purchase_limit"),
         }
 
     @classmethod

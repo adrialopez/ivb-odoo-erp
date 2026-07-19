@@ -223,6 +223,20 @@ class ResCompany(models.Model):
             "group_ids": [(4, self.env.ref("base.group_user").id)],
         })
 
+    def _ivb_get_or_create_tag(self, name):
+        if not name:
+            return self.env["res.partner.category"]
+        Category = self.env["res.partner.category"].sudo()
+        tag = Category.search([("name", "=", name)], limit=1)
+        return tag or Category.create({"name": name})
+
+    def _ivb_get_re_fiscal_position(self):
+        """Posición fiscal de recargo de equivalencia que ya trae la
+        plantilla contable es_pymes (ver README, sección Impuestos)."""
+        return self.env["account.fiscal.position"].sudo().search(
+            [("company_id", "=", self.id), ("name", "=", "Equivalence surcharge")], limit=1
+        )
+
     def _ivb_update_or_create_partner(self, data):
         Partner = self.env["res.partner"].sudo()
         partner = None
@@ -237,6 +251,36 @@ class ResCompany(models.Model):
             "zip": data.get("zip"),
             "customer_rank": 1,
         }
+        if data.get("vat"):
+            vals["vat"] = data["vat"]
+        if data.get("tipo"):
+            tag = self._ivb_get_or_create_tag(data["tipo"].capitalize())
+            vals["category_id"] = [(4, tag.id)]
+        if data.get("sepa_days") is not None:
+            vals["ivb_sepa_days"] = int(data["sepa_days"])
+        if data.get("sepa_min_amount") is not None:
+            vals["ivb_sepa_min_amount"] = data["sepa_min_amount"]
+        if data.get("sepa_max_amount") is not None:
+            vals["ivb_sepa_max_amount"] = data["sepa_max_amount"]
+        if "purchase_limit_enabled" in data:
+            vals["ivb_purchase_limit_enabled"] = bool(data["purchase_limit_enabled"])
+        if data.get("monthly_purchase_limit") is not None:
+            vals["ivb_monthly_purchase_limit"] = data["monthly_purchase_limit"]
+        # Recargo de equivalencia: rol 're' en WooCommerce (mismo rol que ya
+        # usa ivb-pedidos-comerciales para bloquear/permitir formas de pago)
+        # -> posición fiscal "Equivalence surcharge" de la plantilla es_pymes,
+        # que añade el recargo encima del IVA base automáticamente.
+        if data.get("role") == "re":
+            re_position = self._ivb_get_re_fiscal_position()
+            if re_position:
+                vals["property_account_position_id"] = re_position.id
+            else:
+                _logger.warning(
+                    "IVB Connector: cliente %s tiene rol 're' pero no se encontró la "
+                    "posición fiscal 'Equivalence surcharge' en la empresa",
+                    data.get("email"),
+                )
+
         salesperson = self._ivb_find_salesperson(data.get("comercial_email"))
         if salesperson:
             vals["user_id"] = salesperson.id
