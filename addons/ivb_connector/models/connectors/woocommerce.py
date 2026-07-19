@@ -59,12 +59,35 @@ class WooCommerceConnector(EcommerceConnector):
         raw_products = self._get("products", params)
         return [self._normalize_product(p) for p in raw_products]
 
+    #: tope de páginas al paginar /customers, solo para no entrar en un
+    #: bucle infinito si la API se comporta de forma rara; 50*100 = 5000
+    #: clientes, muy por encima de lo que tiene la tienda de IVB hoy.
+    MAX_CUSTOMER_PAGES = 50
+
     def fetch_customers(self, since=None, limit=100):
-        params = {"per_page": min(limit, 100)}
+        # role='all': por defecto /customers de WooCommerce SOLO devuelve
+        # usuarios con rol 'customer' (y similares) — descubierto con datos
+        # reales: una clienta con rol 'farmacia' (ficha completa: CIF,
+        # comercial, SEPA...) no aparecía en absoluto sin este parámetro,
+        # y con él el listado pasó de 3 a 100+ clientes en la primera
+        # página. Sin este fix, roles de negocio reales como 're'
+        # (recargo de equivalencia) quedaban invisibles para el conector.
+        params = {"per_page": min(limit, 100), "role": "all"}
         if since:
             params["modified_after"] = since.isoformat()
-        raw_customers = self._get("customers", params)
-        return [self._normalize_customer(c) for c in raw_customers]
+
+        all_customers = []
+        page = 1
+        while page <= self.MAX_CUSTOMER_PAGES:
+            params["page"] = page
+            raw_page = self._get("customers", params)
+            if not raw_page:
+                break
+            all_customers.extend(raw_page)
+            if len(raw_page) < params["per_page"]:
+                break
+            page += 1
+        return [self._normalize_customer(c) for c in all_customers]
 
     def fetch_orders(self, since=None, limit=100, status=None):
         params = {"per_page": min(limit, 100)}
@@ -133,7 +156,7 @@ class WooCommerceConnector(EcommerceConnector):
     # Placeholders que el sitio de IVB usa quiere decir "sin asignar" en vez
     # de un valor real; se normalizan a None para no meter texto basura en
     # los campos de Odoo.
-    _EMPTY_PLACEHOLDERS = {"no asignado", "no asignada", "n/a", "-"}
+    _EMPTY_PLACEHOLDERS = {"no asignado", "no asignada", "n/a", "-", "ninguno", "ninguna", "none"}
 
     @classmethod
     def _meta_clean(cls, meta_data, key):
@@ -152,7 +175,7 @@ class WooCommerceConnector(EcommerceConnector):
         value = cls._meta_clean(meta_data, key)
         if not value:
             return None
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+        for fmt in ("%Y%m%d", "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
             try:
                 return datetime.strptime(value, fmt).date().isoformat()
             except ValueError:
@@ -173,10 +196,10 @@ class WooCommerceConnector(EcommerceConnector):
             "city": billing.get("city"),
             "zip": billing.get("postcode"),
             "country_code": billing.get("country"),
-            "vat": cls._meta(meta, "cif"),
+            "vat": cls._meta_clean(meta, "cif"),
             "role": c.get("role"),
-            "tipo": cls._meta(meta, "tipo"),
-            "comercial_email": cls._meta(meta, "comercial"),
+            "tipo": cls._meta_clean(meta, "tipo"),
+            "comercial_email": cls._meta_clean(meta, "comercial"),
             "sepa_days": cls._meta_float(meta, "sepa_days"),
             "sepa_min_amount": cls._meta_float(meta, "sepa_min_amount"),
             "sepa_max_amount": cls._meta_float(meta, "sepa_max_amount"),
