@@ -44,7 +44,7 @@ Deliberadamente **fuera** de este PoC:
 
 ```
 ivb-odoo-erp/
-├── docker-compose.yml       # Odoo 17 + Postgres
+├── docker-compose.yml       # Odoo 19 + Postgres
 ├── odoo.conf
 ├── .env.example             # copiar a .env con credenciales de Postgres
 └── addons/

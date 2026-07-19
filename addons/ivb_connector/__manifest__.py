@@ -1,6 +1,6 @@
 {
     "name": "IVB eCommerce Connector",
-    "version": "17.0.1.0.0",
+    "version": "19.0.1.0.0",
     "summary": "Sincroniza productos, clientes y pedidos entre Odoo y la tienda online (WooCommerce hoy, Shopify más adelante)",
     "description": """
 IVB eCommerce Connector
