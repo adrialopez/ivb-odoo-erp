@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <menuitem id="menu_ivb_connector_root" name="IVB Connector" sequence="90" groups="base.group_system"/>
+    <menuitem id="menu_ivb_connector_sync_log" name="Historial de sincronización"
+              parent="menu_ivb_connector_root" action="action_ivb_connector_sync_log" sequence="10"/>
+</odoo>

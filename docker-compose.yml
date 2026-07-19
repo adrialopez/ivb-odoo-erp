@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DB_USER:-odoo}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-odoo}
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+
+  odoo:
+    image: odoo:17.0
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8069:8069"
+    environment:
+      HOST: db
+      USER: ${DB_USER:-odoo}
+      PASSWORD: ${DB_PASSWORD:-odoo}
+    volumes:
+      - odoo-web-data:/var/lib/odoo
+      - ./addons:/mnt/extra-addons
+      - ./odoo.conf:/etc/odoo/odoo.conf
+    # Primera vez: instala Odoo + los módulos base de un distribuidor (sin fabricación)
+    # + el conector propio de IVB. Ejecuciones posteriores pueden quitar --init
+    # y --without-demo (o dejarlos, Odoo ignora módulos ya instalados).
+    command: >
+      odoo -d ivb_odoo
+           --init=sale_management,purchase,stock,product_expiry,account,l10n_es,crm,contacts,barcodes,ivb_connector
+           --without-demo=all
+
+volumes:
+  odoo-db-data:
+  odoo-web-data:

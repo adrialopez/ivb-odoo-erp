@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record id="res_config_settings_view_form_ivb_connector" model="ir.ui.view">
+        <field name="name">res.config.settings.view.form.ivb.connector</field>
+        <field name="model">res.config.settings</field>
+        <field name="inherit_id" ref="base.res_config_settings_view_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//div[hasclass('settings')]" position="inside">
+                <div class="app_settings_block" data-string="IVB Connector" string="IVB Connector" data-key="ivb_connector">
+                    <h2>Conector con la tienda online</h2>
+                    <div class="row mt16 o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="ivb_connector_platform"/>
+                                <field name="ivb_connector_platform"/>
+                                <div class="text-muted">
+                                    WooCommerce está implementado. Shopify queda como placeholder
+                                    hasta que termine la migración de la tienda del cliente.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <label for="ivb_connector_store_url" string="URL de la tienda"/>
+                                <field name="ivb_connector_store_url" placeholder="https://profesional.ivbwellness.com"/>
+                                <label for="ivb_connector_api_key" string="API Key / Consumer Key"/>
+                                <field name="ivb_connector_api_key"/>
+                                <label for="ivb_connector_api_secret" string="API Secret / Consumer Secret"/>
+                                <field name="ivb_connector_api_secret" password="True"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <field name="ivb_connector_sync_products"/>
+                                <label for="ivb_connector_sync_products"/>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <field name="ivb_connector_sync_customers"/>
+                                <label for="ivb_connector_sync_customers"/>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <field name="ivb_connector_sync_orders"/>
+                                <label for="ivb_connector_sync_orders"/>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <field name="ivb_connector_push_stock"/>
+                                <label for="ivb_connector_push_stock"/>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row o_settings_container">
+                        <div class="col-12 col-lg-6 o_setting_box">
+                            <div class="o_setting_right_pane">
+                                <button name="action_ivb_connector_test_connection" type="object"
+                                        string="Probar conexión" class="btn btn-secondary"/>
+                                <button name="action_ivb_connector_sync_now" type="object"
+                                        string="Sincronizar ahora" class="btn btn-primary ms-2"/>
+                                <div class="text-muted mt-2">
+                                    Última sincronización: <field name="ivb_connector_last_sync" readonly="1"/>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </xpath>
+        </field>
+    </record>
+</odoo>
