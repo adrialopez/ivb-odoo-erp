@@ -28,7 +28,10 @@ class EcommerceConnector(ABC):
     @abstractmethod
     def fetch_products(self, since=None, limit=100):
         """Devuelve una lista de dicts:
-        {external_id, sku, name, description, price, stock_qty, barcode}
+        {external_id, sku, name, description, price, stock_qty, barcode, tax_class}
+        tax_class es el slug de la clase de impuesto en la plataforma de origen
+        (en WooCommerce: standard/tasa-reducida/tasa-cero/...-re); se mapea a
+        un impuesto real de Odoo en res_company_sync.py.
         """
 
     @abstractmethod

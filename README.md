@@ -55,6 +55,7 @@ ivb-odoo-erp/
 ├── docker-compose.yml       # Odoo 19 + Postgres
 ├── odoo.conf
 ├── .env.example             # copiar a .env con credenciales de Postgres
+├── scripts/bootstrap.sh     # instala + localización ES + idioma + arranca el servidor
 └── addons/
     └── ivb_connector/
         ├── models/
@@ -82,8 +83,7 @@ rellenar `shopify.py` con las mismas firmas — el resto del módulo no cambia.
 
 ## Cómo levantarlo
 
-Requiere Docker Desktop (no estaba instalado en esta máquina al crear el
-PoC — instálalo desde docker.com o `brew install --cask docker`).
+Requiere Docker Desktop.
 
 ```bash
 cd ivb-odoo-erp
@@ -91,57 +91,93 @@ cp .env.example .env   # y cambia la contraseña de Postgres
 docker compose up
 ```
 
-Primer arranque: instala Odoo + todas las apps de la tabla de arriba
-automáticamente (`--init=...` en `docker-compose.yml`). Tarda unos minutos.
-Luego entra en http://localhost:8069 con usuario `admin` / contraseña `admin`
-(cámbiala en cuanto entres) y crea la base de datos si no se creó sola.
+Todo el arranque (instalar módulos, país España + plan contable PYMES,
+idioma español del admin) lo hace `scripts/bootstrap.sh`, que es el
+`command:` del contenedor Odoo en `docker-compose.yml` — no hace falta
+ningún paso manual, incluso partiendo de `docker compose down -v` (borrado
+total). Tarda unos minutos la primera vez. Luego entra en
+http://localhost:8069 con `admin` / `admin` (cámbiala en cuanto entres).
 
-### Poner la interfaz en español
+`bootstrap.sh` existe en vez de un `post_init_hook` normal de Odoo porque
+se probó y **no es fiable**: cargar el plan contable español dentro de un
+post_init_hook se revertía a mitad de la instalación (algo posterior en la
+misma transacción de instalación lo pisaba con el plan contable genérico;
+no se identificó la causa exacta pese a varios intentos). Ejecutarlo en su
+propio proceso `odoo shell`, después de que la instalación de módulos ya
+haya hecho commit, funciona de forma consistente — así que el script hace
+eso: instala módulos → (proceso aparte) idioma → (proceso aparte) país +
+plan contable → arranca el servidor real.
 
-Por defecto Odoo instala solo en inglés. Para cargar el paquete de español
-y ponerlo como idioma del usuario admin:
-
-```bash
-docker compose exec -T odoo odoo -d ivb_odoo --db_host=db \
-  --db_user=$DB_USER --db_password=$DB_PASSWORD \
-  --load-language=es_ES --stop-after-init
-
-docker compose exec -T odoo odoo shell -d ivb_odoo --db_host=db \
-  --db_user=$DB_USER --db_password=$DB_PASSWORD --no-http <<'PYEOF'
-env['res.users'].search([('login','=','admin')]).write({'lang': 'es_ES'})
-env.cr.commit()
-PYEOF
-```
-
-**Nota:** esto vive en la base de datos, no en el código. Si alguna vez
-haces `docker compose down -v` (borra los volúmenes y reinstala desde cero,
-como se hizo varias veces durante el desarrollo de este PoC para probar
-cambios en los módulos), hay que repetirlo.
-
-## Configurar el conector (con credenciales de prueba/placeholder)
+## Configurar el conector
 
 1. Ajustes → busca "IVB Connector".
 2. Plataforma: WooCommerce.
-3. URL de la tienda: `https://profesional.ivbwellness.com` (o cualquier
-   WooCommerce de pruebas).
-4. API Key / Secret: genera un par en WooCommerce → Ajustes → Avanzado →
-   REST API (permisos de solo lectura para probar; lectura/escritura si
-   quieres probar el envío de stock).
-5. Botón "Probar conexión" y luego "Sincronizar ahora".
-6. Revisar el resultado en **IVB Connector → Historial de sincronización**.
+3. URL de la tienda, API Key/Secret (WooCommerce → Ajustes → Avanzado →
+   REST API; solo lectura mientras el conector esté en modo solo lectura).
+4. Botón "Probar conexión" y luego "Sincronizar ahora".
+5. Revisar el resultado en **IVB Connector → Historial de sincronización**.
+
+Estas credenciales viven en la base de datos (`res.company`), no en el
+código — un `docker compose down -v` las borra y hay que volver a
+introducirlas a mano.
 
 El cron (`ir_cron_data.xml`) está **inactivo por defecto** — actívalo desde
 Ajustes técnicos → Automatización → Acciones programadas una vez haya
 credenciales reales, para no sincronizar contra nada con las de ejemplo.
 
+## Impuestos (IVA + recargo de equivalencia)
+
+El plan contable español (`es_pymes`, cargado automáticamente por
+`bootstrap.sh`) trae los tipos de IVA reales (21%/10%/4%/0%, cada uno con
+variante "G"/"S") y los de recargo de equivalencia (RE) como impuestos de
+recargo independientes (`5.2% SE`, `1.4% SE`, `0.5% SE`...), más una
+posición fiscal ya lista llamada **"Equivalence surcharge"** que añade el
+recargo correspondiente encima del IVA base sin tocar nada más.
+
+**Por producto:** cada producto sincronizado desde WooCommerce trae su
+`tax_class` (`standard`, `tasa-reducida`, `tasa-cero`, y las variantes
+`-re`) y `_ivb_get_sale_tax`/`WOOCOMMERCE_TAX_CLASS_TO_ODOO_TAX` en
+`res_company_sync.py` lo mapean al impuesto real de venta (`21% S`,
+`10% S`, `0% S`) al crear el producto en Odoo. Solo se asigna al crear —
+un resync no pisa un impuesto que se haya corregido a mano.
+
+**Por cliente (RE):** en Odoo el recargo se aplica por *cliente*
+(posición fiscal), no por producto — mucho más limpio que el hack de
+WooCommerce de duplicar cada producto en una clase `-re`. **Pendiente:**
+el conector todavía no asigna la posición fiscal "Equivalence surcharge"
+a los clientes RE, porque no está resuelto de dónde sacar qué clientes de
+WooCommerce son RE (¿rol `re` de WordPress, expuesto en la API? ¿una lista
+aparte?). Hasta que se resuelva, hay que marcarlo a mano por cliente en
+Odoo (Ventas → Clientes → pestaña Ventas y compras → Posición fiscal).
+
+## Pedidos: se confirman solos si ya están pagados
+
+Un pedido de WooCommerce con estado `processing` o `completed` se importa
+**ya confirmado** (`sale.order` en estado `sale`, no presupuesto) —
+`action_confirm()` se llama automáticamente en `_ivb_update_or_create_order`.
+Pedidos `pending`, `on-hold`, `cancelled` o `refunded` se quedan como
+presupuesto (`draft`): confirmarlos en Odoo sería mentir sobre su estado
+real en la tienda. Si un pedido no tiene ninguna línea reconocida (todos
+los SKU son desconocidos en Odoo) tampoco se confirma, aunque el estado
+en origen sea `completed`.
+
 ## Qué falta para pasar de PoC a producción
 
 - Implementar `shopify.py` cuando termine la migración (mismas firmas que
   `woocommerce.py`).
+- Asignar la posición fiscal de recargo de equivalencia por cliente (ver
+  sección de impuestos arriba) — falta decidir la fuente de esa
+  información en WooCommerce.
+- **Asignación de comercial por cliente:** IVB tiene un listado de qué
+  comercial lleva cada cliente. Falta decidir de dónde lo lee el conector
+  (¿el mismo mecanismo que ya usa `ivb-pedidos-comerciales` — meta
+  `_ipc_comercial_email` en WooCommerce —, o una lista aparte que dé el
+  cliente?) y mapear ese email a un `res.users` de Odoo para poner
+  `sale.order.user_id` al crear el pedido.
 - Reglas de precio/tarifa por cliente (B2B vs B2C) — Odoo `product.pricelist`.
 - Multi-almacén real si IVB tiene más de un almacén físico.
-- Decisión sobre roles específicos de IVB (comercial, SEPA, recargo de
-  equivalencia — ver memoria de `ivb-pedidos-comerciales`): si se quieren
-  reflejar en Odoo (grupos de usuario, fiscal position RE) o quedarse solo
-  en la tienda.
+- Paginación completa del catálogo al sincronizar productos (ahora mismo
+  solo se trae la primera página de 100, así que pedidos con SKUs fuera de
+  esa página se importan con esas líneas omitidas — hay un warning en el
+  log de Odoo por cada línea omitida).
 - Backup/restore y entorno de staging antes de tocar datos reales.

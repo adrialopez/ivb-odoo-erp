@@ -19,7 +19,7 @@ Odoo) no cambia al cambiar de plataforma.
     "website": "https://adria-lopez.com",
     "license": "LGPL-3",
     "category": "Sales/Sales",
-    "depends": ["base", "sale_management", "purchase", "stock", "contacts"],
+    "depends": ["base", "sale_management", "purchase", "stock", "contacts", "account", "l10n_es"],
     "data": [
         "security/ir.model.access.csv",
         "data/ir_cron_data.xml",

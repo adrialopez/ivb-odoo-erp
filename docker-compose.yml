@@ -24,13 +24,12 @@ services:
       - odoo-web-data:/var/lib/odoo
       - ./addons:/mnt/extra-addons
       - ./odoo.conf:/etc/odoo/odoo.conf
-    # Primera vez: instala Odoo + los módulos base de un distribuidor (sin fabricación)
-    # + el conector propio de IVB. Ejecuciones posteriores pueden quitar --init
-    # y --without-demo (o dejarlos, Odoo ignora módulos ya instalados).
-    command: >
-      odoo -d ivb_odoo
-           --init=sale_management,purchase,stock,product_expiry,account,l10n_es,crm,contacts,barcodes,ivb_connector
-           --without-demo=all
+      - ./scripts/bootstrap.sh:/bootstrap.sh
+    # bootstrap.sh instala los módulos base de un distribuidor (sin
+    # fabricación) + el conector de IVB, aplica la localización española
+    # (país + plan contable PYMES) y el idioma, y luego arranca el
+    # servidor. Ver el propio script para el porqué no es un post_init_hook.
+    command: bash /bootstrap.sh
 
 volumes:
   odoo-db-data:

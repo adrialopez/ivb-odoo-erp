@@ -101,6 +101,7 @@ class WooCommerceConnector(EcommerceConnector):
             "price": float(p.get("regular_price") or p.get("price") or 0.0),
             "stock_qty": p.get("stock_quantity") if p.get("stock_quantity") is not None else 0,
             "barcode": False,
+            "tax_class": p.get("tax_class") or "standard",
         }
 
     @staticmethod

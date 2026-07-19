@@ -24,6 +24,19 @@ _logger = logging.getLogger(__name__)
 # Cuando se quiera activar de verdad, cambiar a False aquí explícitamente.
 READ_ONLY_MODE = True
 
+# Clase de impuesto de WooCommerce -> nombre del impuesto de venta en el plan
+# contable español (plantilla es_pymes). El sufijo "-re" de WooCommerce marca
+# la variante de recargo de equivalencia del mismo producto para ese tipo de
+# cliente; en Odoo el recargo se aplica por *cliente* (posición fiscal), no
+# por producto, así que aquí solo nos importa el tipo base de IVA.
+WOOCOMMERCE_TAX_CLASS_TO_ODOO_TAX = {
+    "standard": "21% S",
+    "estandar-re": "21% S",
+    "tasa-reducida": "10% S",
+    "tasa-reducida-re": "10% S",
+    "tasa-cero": "0% S",
+}
+
 
 class ResCompany(models.Model):
     _inherit = "res.company"
@@ -112,16 +125,38 @@ class ResCompany(models.Model):
     # -- productos ------------------------------------------------------
     def _ivb_sync_products(self, connector, since):
         started = time.time()
+        tax_cache = self._ivb_build_sale_tax_cache()
         try:
             products = connector.fetch_products(since=since)
             for data in products:
-                self._ivb_update_or_create_product(data)
+                self._ivb_update_or_create_product(data, tax_cache)
         except ConnectorError as exc:
             self._ivb_log("products", "error", message=str(exc), duration=time.time() - started)
             return
         self._ivb_log("products", "success", record_count=len(products), duration=time.time() - started)
 
-    def _ivb_update_or_create_product(self, data):
+    def _ivb_build_sale_tax_cache(self):
+        """Resuelve una vez por sincronización el account.tax de venta que
+        corresponde a cada tax_class de WooCommerce (no se puede cachear en
+        el propio recordset: los modelos de Odoo usan __slots__ y no admiten
+        atributos nuevos, de ahí este dict aparte pasado por parámetro)."""
+        self.ensure_one()
+        AccountTax = self.env["account.tax"].sudo()
+        cache = {}
+        for tax_class, tax_name in WOOCOMMERCE_TAX_CLASS_TO_ODOO_TAX.items():
+            tax = AccountTax.search(
+                [("company_id", "=", self.id), ("type_tax_use", "=", "sale"), ("name", "=", tax_name)], limit=1
+            )
+            if not tax:
+                _logger.warning(
+                    "IVB Connector: no se encontró el impuesto '%s' en la empresa %s — "
+                    "¿se cargó el plan contable español (l10n_es)?",
+                    tax_name, self.display_name,
+                )
+            cache[tax_class] = tax
+        return cache
+
+    def _ivb_update_or_create_product(self, data, tax_cache):
         Product = self.env["product.template"].sudo()
         product = Product.search([("default_code", "=", data["sku"]), ("company_id", "in", [self.id, False])], limit=1)
         vals = {
@@ -131,12 +166,20 @@ class ResCompany(models.Model):
             "description_sale": data.get("description") or False,
         }
         if product:
+            # No se toca taxes_id en un producto ya existente: si alguien lo
+            # corrigió a mano en Odoo, un resync no debe deshacerlo.
             product.write(vals)
         else:
             # Odoo 19: ya no existe type="product" para artículos con stock;
             # ahora es type="consu" + is_storable=True (antes de 18 sí existía
             # el valor "product" en el selection, por eso el fallo original).
-            vals.update({"type": "consu", "is_storable": True, "company_id": self.id})
+            tax = tax_cache.get(data.get("tax_class")) or tax_cache.get("standard")
+            vals.update({
+                "type": "consu",
+                "is_storable": True,
+                "company_id": self.id,
+                "taxes_id": [(6, 0, tax.ids)] if tax else False,
+            })
             Product.create(vals)
 
     # -- clientes ---------------------------------------------------------
@@ -212,7 +255,7 @@ class ResCompany(models.Model):
                 })
             )
 
-        return SaleOrder.create(
+        order = SaleOrder.create(
             {
                 "company_id": self.id,
                 "partner_id": partner.id,
@@ -221,6 +264,19 @@ class ResCompany(models.Model):
                 "order_line": order_lines,
             }
         )
+        # Solo confirmamos (deja de ser presupuesto) los pedidos que en la
+        # tienda ya están pagados/en curso. Los que están pendientes de pago,
+        # en espera, cancelados o reembolsados se quedan como presupuesto:
+        # confirmarlos en Odoo sería mentir sobre su estado real.
+        if data.get("status") in ("processing", "completed") and order_lines:
+            try:
+                order.action_confirm()
+            except Exception:  # noqa: BLE001 - no debe tumbar el resto del sync
+                _logger.exception(
+                    "IVB Connector: no se pudo confirmar el pedido %s (se deja como presupuesto)",
+                    data["external_id"],
+                )
+        return order
 
     # -- stock hacia la tienda ------------------------------------------
     def _ivb_push_stock(self, connector):
