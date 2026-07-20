@@ -194,12 +194,28 @@ class ResCompany(models.Model):
         started = time.time()
         try:
             customers = connector.fetch_customers(since=since)
-            for data in customers:
-                self._ivb_update_or_create_partner(data)
         except ConnectorError as exc:
             self._ivb_log("customers", "error", message=str(exc), duration=time.time() - started)
             return
-        self._ivb_log("customers", "success", record_count=len(customers), duration=time.time() - started)
+        skipped = 0
+        for data in customers:
+            try:
+                with self.env.cr.savepoint():
+                    self._ivb_update_or_create_partner(data)
+            except Exception:  # noqa: BLE001 - datos sucios de un cliente no
+                # deben tumbar la sincronización de los demás (ej. un CIF
+                # placeholder inválido que rompe la validación de NIF de Odoo
+                # en cuanto se conoce el país del contacto).
+                skipped += 1
+                _logger.warning(
+                    "IVB Connector: no se pudo sincronizar el cliente %s, se omite",
+                    data.get("email") or data.get("external_id"), exc_info=True,
+                )
+        self._ivb_log(
+            "customers", "success", record_count=len(customers) - skipped,
+            message=(f"{skipped} clientes omitidos por datos inválidos" if skipped else ""),
+            duration=time.time() - started,
+        )
 
     def _ivb_find_salesperson(self, comercial_email):
         """Busca el res.users cuyo login es el email del comercial (meta
@@ -247,11 +263,27 @@ class ResCompany(models.Model):
             [("company_id", "=", self.id), ("name", "=", "Equivalence surcharge")], limit=1
         )
 
+    def _ivb_get_country(self, country_code):
+        if not country_code:
+            return self.env["res.country"]
+        return self.env["res.country"].sudo().search([("code", "=", country_code.upper())], limit=1)
+
+    def _ivb_get_state(self, country, state_code):
+        if not country or not state_code:
+            return self.env["res.country.state"]
+        State = self.env["res.country.state"].sudo()
+        # WooCommerce manda el código de provincia (ej. "V" para Valencia);
+        # a veces también manda el nombre completo, así que se prueba
+        # primero por código exacto y si no por nombre.
+        state = State.search([("country_id", "=", country.id), ("code", "=", state_code.upper())], limit=1)
+        return state or State.search([("country_id", "=", country.id), ("name", "=ilike", state_code)], limit=1)
+
     def _ivb_update_or_create_partner(self, data):
         Partner = self.env["res.partner"].sudo()
         partner = None
         if data.get("email"):
             partner = Partner.search([("email", "=", data["email"]), ("company_id", "in", [self.id, False])], limit=1)
+        country = self._ivb_get_country(data.get("country_code"))
         vals = {
             "name": data["name"] or data.get("email") or "Cliente sin nombre",
             "email": data.get("email"),
@@ -260,7 +292,19 @@ class ResCompany(models.Model):
             "city": data.get("city"),
             "zip": data.get("zip"),
             "customer_rank": 1,
+            # IVB es una empresa española y todos sus clientes son de aquí:
+            # la interfaz de cada contacto se ve siempre en español,
+            # independientemente del idioma del navegador con el que se
+            # registraron en la tienda.
+            "lang": "es_ES",
         }
+        if data.get("company_name"):
+            vals["company_name"] = data["company_name"]
+        if country:
+            vals["country_id"] = country.id
+            state = self._ivb_get_state(country, data.get("state_code"))
+            if state:
+                vals["state_id"] = state.id
         if data.get("vat"):
             vals["vat"] = data["vat"]
         if data.get("tipo"):

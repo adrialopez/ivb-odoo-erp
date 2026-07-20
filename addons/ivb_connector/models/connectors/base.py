@@ -37,11 +37,18 @@ class EcommerceConnector(ABC):
     @abstractmethod
     def fetch_customers(self, since=None, limit=100):
         """Devuelve una lista de dicts:
-        {external_id, name, email, phone, street, city, zip, country_code,
-         vat, role, tipo, comercial_email, sepa_days, sepa_min_amount,
-         sepa_max_amount, purchase_limit_enabled, monthly_purchase_limit,
-         apertura_email, procedencia, iqvia, escala, escala_automatica,
-         unidades_compradas, fecha_cumpleanos, visitada, grupo_compra}
+        {external_id, name, email, phone, company_name, street, city, zip,
+         state_code, country_code, vat, role, tipo, comercial_email,
+         sepa_days, sepa_min_amount, sepa_max_amount, purchase_limit_enabled,
+         monthly_purchase_limit, apertura_email, procedencia, iqvia, escala,
+         escala_automatica, unidades_compradas, fecha_cumpleanos, visitada,
+         grupo_compra}
+        - company_name: nombre de empresa del cliente si lo indicó al
+          registrarse (campo "Company" de WooCommerce).
+        - state_code, country_code: se resuelven a res.country.state /
+          res.country en res_company_sync.py. country_code cae a "ES" si
+          WooCommerce no manda país — todos los clientes de IVB son de
+          España.
         - role: rol de la plataforma de origen (en WooCommerce: 'customer',
           'subscriber', 're', 'sepa', 'comercial'... son roles custom del
           sitio de IVB). role == 're' dispara la posición fiscal de recargo
